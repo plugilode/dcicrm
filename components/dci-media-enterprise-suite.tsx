@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import {
   Activity,
   AlertCircle,
@@ -94,13 +95,14 @@ export default function DCIMediaEnterpriseSuite() {
               {[
                 { name: "Dashboard", icon: LayoutDashboard },
                 { name: "Kontakte", icon: Users },
-                { name: "Unternehmen", icon: Building2 },
+                { name: "Unternehmen", icon: Building2, path: "/unternehmen" },
                 { name: "Kampagnen", icon: BarChart3 },
                 { name: "Bookmarks", icon: BookmarkPlus },
                 { name: "Datenbank", icon: Database },
               ].map((item) => (
-                <button
+                <Link 
                   key={item.name}
+                  href={item.path || "#"}
                   className={`flex items-center gap-3 w-full p-2 rounded-md ${
                     activeTab === item.name ? "text-[#0098d1] bg-[#e6f7fd]" : "text-[#3f3f3f]"
                   }`}
@@ -108,7 +110,7 @@ export default function DCIMediaEnterpriseSuite() {
                 >
                   <item.icon className="h-5 w-5" />
                   <span>{item.name}</span>
-                </button>
+                </Link>
               ))}
             </nav>
           </div>
@@ -1652,4 +1654,3 @@ export default function DCIMediaEnterpriseSuite() {
     </div>
   )
 }
-
