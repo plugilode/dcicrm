@@ -1,12 +1,14 @@
-// ... existing code ...
+
+require('dotenv').config();
+console.log("DATABASE_URL:", process.env.DATABASE_URL);
 
 const { Pool } = require('pg');
 
+process.env.PGSSLMODE = 'require';
 const pool = new Pool({
-  connectionString: process.env.POSTGRES_URL,
+  connectionString: process.env.DATABASE_URL,
   ssl: {
-    rejectUnauthorized: false, // Allow self-signed certificates for development
-    require: true
+    rejectUnauthorized: false // Allow self-signed certificates for development
   }
 });
 

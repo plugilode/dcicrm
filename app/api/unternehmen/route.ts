@@ -7,22 +7,24 @@ export async function GET() {
   try {
     console.log("Querying database for companies");
     const result = await query('SELECT * FROM companies ORDER BY created_at DESC');
-    const companies = result.rows.map((company: Company) => ({
+    console.log("Raw query result:", result.rows);
+    console.log("Found", result.rows.length, "companies");
+    const companies = result.rows.map((company: any) => ({
       id: company.id,
       name: company.name,
-      logo_url: company.logo_url || '/placeholder-logo.svg',
-      city: company.city || 'N/A',
-      foundation_date: company.foundation_date || null,
-      domain: company.domain || 'N/A',
-      employee_range: company.employee_range || '1-10',
-      categories: company.categories || [],
-      industry: company.industry || 'N/A',
-      address: company.address || 'N/A',
-      contact_email: company.contact_email || 'N/A',
-      revenue: company.revenue || 0,
-      active: company.active || true,
-      createdAt: company.createdAt,
-      updatedAt: company.updatedAt,
+      logo_url: company.logo_url,
+      city: company.city,
+      foundation_date: company.foundation_date,
+      domain: company.domain,
+      employee_range: company.employee_range,
+      categories: company.categories,
+      industry: company.industry,
+      address: company.address,
+      contact_email: company.contact_email,
+      revenue: company.revenue,
+      active: company.active,
+      createdAt: company.created_at,
+      updatedAt: company.updated_at,
     }));
     return NextResponse.json(companies);
   } catch (error: any) {

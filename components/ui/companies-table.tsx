@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { useState, useMemo, useEffect, useRef } from "react";
 import Loader from "@/components/ui/loader"; // Correct import statement
 import { ArrowUpDown } from "lucide-react";
+import Link from "next/link";
 
 type SortColumn = keyof Company | null;
 type SortDirection = "asc" | "desc";
@@ -214,6 +215,9 @@ export default function CompaniesTable({ companies = [] }: CompaniesTableProps) 
     </DialogContent>
   </Dialog>
   <Button variant="destructive" size="sm">Delete</Button>
+  <Link href={`/unternehmen/${company.id}`} passHref>
+    <Button variant="outline" size="sm">More</Button>
+  </Link>
 </TableCell>
           </TableRow>
         ))}

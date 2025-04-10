@@ -1,0 +1,96 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider     = "postgresql"
+  url          = env("DATABASE_URL")
+  relationMode = "prisma"
+}
+
+model companies {
+  id                        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                      String    @db.VarChar(255)
+  logo_url                  String?   @db.VarChar(255)
+  city                      String?   @db.VarChar(255)
+  foundation_date           Int?
+  domain                    String?   @db.VarChar(255)
+  employee_range            String?   @db.VarChar(50)
+  categories                String[]
+  industry                  String?   @db.VarChar(100)
+  address                   String?
+  contact_email             String?   @db.VarChar(255)
+  revenue                   Decimal?  @db.Decimal
+  active                    Boolean?  @default(true)
+  catchall_email_domain     String?   @db.VarChar(255)
+  cleaned_phone_number      String?   @db.VarChar(50)
+  additional_industries     String[]
+  alexa_rank                Int?
+  angel_list_profile_url    String?   @db.VarChar(255)
+  blog_url                  String?   @db.VarChar(255)
+  business_industries       String[]
+  country_name              String?   @db.VarChar(255)
+  crunchbase_url            String?   @db.VarChar(255)
+  employee_estimate         Int?
+  facebook_profile_url      String?   @db.VarChar(255)
+  full_address              String?
+  linkedin_id               String?   @db.VarChar(255)
+  linkedin_profile_url      String?   @db.VarChar(255)
+  main_domain               String?   @db.VarChar(255)
+  main_phone_cleaned_number String?   @db.VarChar(50)
+  main_phone_number         String?   @db.VarChar(50)
+  main_phone_source         String?   @db.VarChar(255)
+  search_keywords           String[]
+  spoken_languages          String[]
+  state_name                String?   @db.VarChar(255)
+  stock_exchange            String?   @db.VarChar(255)
+  stock_symbol              String?   @db.VarChar(255)
+  store_count               Int?
+  twitter_profile_url       String?   @db.VarChar(255)
+  website_url               String?   @db.VarChar(255)
+  year_founded              Int?
+  zip_code                  String?   @db.VarChar(20)
+  created_at                DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@index([categories], map: "idx_companies_categories", type: Gin)
+  @@index([city], map: "idx_companies_city")
+  @@index([domain], map: "idx_companies_domain")
+  @@index([name], map: "idx_companies_name")
+}
+
+model company_contacts {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  company_id String?  @db.Uuid
+  name       String   @db.VarChar(255)
+  email      String?  @db.VarChar(255)
+  phone      String?  @db.VarChar(50)
+  position   String?  @db.VarChar(100)
+  is_primary Boolean? @default(false)
+
+  @@index([company_id], map: "idx_company_contacts_company_id")
+}
+
+model company_tasks {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  company_id       String?   @db.Uuid
+  title            String    @db.VarChar(255)
+  description      String?
+  status           String?   @default("pending") @db.VarChar(50)
+  due_date         DateTime? @db.Date
+  assigned_user_id String?   @db.Uuid
+
+  @@index([company_id], map: "idx_company_tasks_company_id")
+  @@index([due_date], map: "idx_company_tasks_due_date")
+  @@index([status], map: "idx_company_tasks_status")
+}
+
+/// This table has subclasses and requires additional setup for migrations. Visit https://pris.ly/d/table-inheritance for more info.
+model tenants {
+  id         String    @id @default(dbgenerated("public.uuid_generate_v7()")) @db.Uuid
+  name       String?
+  created    DateTime  @default(dbgenerated("LOCALTIMESTAMP")) @db.Timestamp(6)
+  updated    DateTime  @default(dbgenerated("LOCALTIMESTAMP")) @db.Timestamp(6)
+  deleted    DateTime? @db.Timestamp(6)
+  compute_id String?   @db.Uuid
+}

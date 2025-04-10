@@ -54,3 +54,16 @@ export async function getCompanies(): Promise<Company[]> {
   }
   return response.json()
 }
+
+export async function getCompanyById(id: string): Promise<Company | null> {
+  console.log(`Fetching company with ID: ${id}`);
+  const response = await fetch(`/api/unternehmen/${id}`);
+  console.log("Response status:", response.status);
+  if (!response.ok) {
+    if (response.status === 404) {
+      return null;
+    }
+    throw new Error('Fehler beim Laden des Unternehmens')
+  }
+  return response.json()
+}

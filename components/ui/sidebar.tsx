@@ -4,6 +4,7 @@ import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { VariantProps, cva } from "class-variance-authority"
 import { PanelLeft } from "lucide-react"
+import { AIAssistant } from "./ai-assistant"
 
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
@@ -176,12 +177,10 @@ const SidebarProvider = React.forwardRef<
             {...props}
           >
             <SidebarMenu>
+              {/* Menu items are defined in layout.tsx */}
               <SidebarMenuItem>
-                <SidebarMenuSubButton href="/kontakte">
-                  Contacts
-                </SidebarMenuSubButton>
+                <AIAssistant />
               </SidebarMenuItem>
-              {/* Other existing menu items can be added here */}
             </SidebarMenu>
             {children}
           </div>
