@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/select"; // Import Select
 import { Settings2, Upload, List, LayoutGrid, Filter } from 'lucide-react'; // Import icons
 import Link from 'next/link';
-import CompaniesTable from '@/components/ui/companies-table';
+import { CompaniesTable } from '@/components/ui/companies-table';
 import { getCompanies, Company } from '@/lib/api';
 import { ChangeEvent, useMemo } from 'react';
 

@@ -37,7 +37,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
 import { getCompanyById, Company } from "../../lib/data/companies"
-import { Contact, getContactsByCompanyId } from "../../lib/data/contacts"
+import { Contact, getContactsByCompanyId, getAssignedEmployee, AssignedEmployee } from "../../lib/data/contacts"
 import {
   Dialog,
   DialogContent,
@@ -46,31 +46,31 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 
-// Add this function after the imports
 const formatNumber = (value: number | string | undefined): string => {
   if (value === undefined || value === null) return "–"
 
-  // If it's already a string that might contain formatting, return it
   if (typeof value === "string" && isNaN(Number(value.replace(/\./g, "").replace(/,/g, "")))) {
     return value
   }
 
-  // Convert to number if it's a string
   const num = typeof value === "string" ? Number.parseFloat(value.replace(/\./g, "").replace(/,/g, "")) : value
 
-  // Format with German locale (dots as thousand separators)
   return num.toLocaleString("de-DE")
 }
-
-// Add a function to get the logo URL from Clearbit based on the company's website domain
-// Add this function after the formatNumber function
 
 const getCompanyLogo = (website: string): string => {
   if (!website) return "/placeholder.svg"
 
   try {
-    // Extract the domain from the website URL
     const domain = website.replace(/^https?:\/\//, "").split("/")[0]
     return `https://logo.clearbit.com/${domain}`
   } catch (error) {
@@ -78,7 +78,6 @@ const getCompanyLogo = (website: string): string => {
   }
 }
 
-// Add this type definition after the other type definitions or before the component
 type EnrichmentResult = {
   field: string
   currentValue: string
@@ -106,17 +105,52 @@ export default function CompanyDetail({ companyId }: { companyId: string }) {
 
   const [company, setCompany] = useState<Company | null>(null);
   const [loading, setLoading] = useState(true);
+  const [assignedEmployee, setAssignedEmployee] = useState<AssignedEmployee | undefined>(undefined)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [customerStatus, setCustomerStatus] = useState(company?.type || "prospect");
+  const [addToContactsOpen, setAddToContactsOpen] = useState(false);
+  const [decisionMaker, setDecisionMaker] = useState<any>(null);
+
+  const extractDecisionMaker = (company: any) => {
+    if (!company) return null;
+    const leadershipTitles = [
+      'CEO', 'CFO', 'CTO', 'COO', 'Founder', 'Geschäftsführer',
+      'Managing Director', 'Board Member', 'President', 'Vorstand'
+    ];
+
+    const title = company.role;
+    const isLeader = leadershipTitles.some(t => title?.includes(t));
+
+    if (isLeader) {
+      return {
+        name: company.firstName + ' ' + company.lastName,
+        role: company.role,
+        email: company.email,
+        image: company.image,
+        linkedin: company.linkedin
+      };
+    }
+    return null;
+  };
+
   useEffect(() => {
     getCompanyById(companyId)
       .then((data) => {
         setCompany(data);
+        setCustomerStatus(data?.type || "prospect");
         setLoading(false);
+        const leader = extractDecisionMaker(data);
+        setDecisionMaker(leader);
       })
       .catch((error) => {
         console.error("Error fetching company:", error);
         setLoading(false);
       });
+
+    const employee = getAssignedEmployee(companyId)
+    setAssignedEmployee(employee)
   }, [companyId]);
+
   const contacts = company ? getContactsByCompanyId(company.id) : []
 
   useEffect(() => {
@@ -157,143 +191,138 @@ export default function CompanyDetail({ companyId }: { companyId: string }) {
     )
   }
 
-  const handleSave = () => {
-    setSaving(true)
-    // Simulate API call
-    setTimeout(() => {
-      setSaving(false)
-      setIsEditing(false)
-    }, 1000)
-  }
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const updatedCompany = {
+        ...company,
+        type: customerStatus,
+      };
 
-  // Generate random data for the 3D chart
-  const generateChartData = () => {
-    return Array.from({ length: 12 }, () => Math.floor(Math.random() * 100))
-  }
+      setCompany(updatedCompany);
+      setHasUnsavedChanges(false);
+      setIsEditing(false);
+    } catch (error) {
+      console.error("Error saving company:", error);
+    } finally {
+      setSaving(false);
+    }
+  };
 
-  const chartData = generateChartData()
-  const maxValue = Math.max(...chartData)
+  const handleStatusChange = (value: string) => {
+    setCustomerStatus(value);
+    setHasUnsavedChanges(true);
+  };
 
-  // Financial metrics for the company
-  const financialMetrics = [
-    { name: "Umsatz", value: company.revenue || "€4.5M", change: "+12.5%", trend: "up" },
-    { name: "Mitarbeiter", value: formatNumber(company.employees), change: "+5.2%", trend: "up" },
-    { name: "Projekte", value: "8", change: "+2", trend: "up" },
-    { name: "Kundenzufriedenheit", value: "94%", change: "+2.1%", trend: "up" },
-  ]
-
-  const handleEnrichment = async () => {
-    if (!company) return
-
-    setEnrichmentLoading(true)
-    setEnrichmentOpen(true)
+  const handleAddToContacts = async () => {
+    if (!decisionMaker) return;
 
     try {
-      // Simulate API call to OpenAI/Gemini
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      const newContact = {
+        name: decisionMaker.name,
+        role: decisionMaker.role,
+        email: decisionMaker.email,
+        linkedin: decisionMaker.linkedin,
+        image: decisionMaker.image,
+        companyId: companyId,
+        status: "lead"
+      };
 
-      // Mock enrichment results - in a real implementation, this would come from the API
-      const mockResults: EnrichmentResult[] = [
-        {
-          field: "Mitarbeiter",
-          currentValue: company.employees.toString(),
-          newValue: (company.employees + 500).toString(),
-          source: {
-            name: "LinkedIn",
-            type: "Sonstiges",
-            date: "vor 2 Tagen",
-          },
-        },
-        {
-          field: "Umsatz",
-          currentValue: company.revenue || "Unbekannt",
-          newValue: company.revenue ? company.revenue.replace("Mrd", "Mrd.") + " (2023)" : "€4.7 Mrd. (2023)",
-          source: {
-            name: "Geschäftsbericht",
-            type: "Sonstiges",
-            date: "2023",
-          },
-        },
-        {
-          field: "Beschreibung",
-          currentValue: company.description,
-          newValue:
-            company.description +
-            " Das Unternehmen hat kürzlich eine neue Cloud-Strategie angekündigt und plant, bis 2025 vollständig auf erneuerbare Energien umzusteigen.",
-          source: {
-            name: "Pressemitteilung",
-            type: "Google",
-            date: "15.03.2023",
-          },
-        },
-        {
-          field: "Website",
-          currentValue: company.website,
-          newValue: company.website,
-          source: {
-            name: "Unverändert",
-            type: "Sonstiges",
-          },
-        },
-        {
-          field: "Bewertung",
-          currentValue: "Keine Bewertung",
-          newValue: "4.7/5.0 (238 Bewertungen)",
-          source: {
-            name: "TrustedShops",
-            type: "TrustedShops",
-            date: "Aktuell",
-          },
-        },
-        {
-          field: "Adresse",
-          currentValue: `${company.address}, ${company.zip} ${company.city}`,
-          newValue: `${company.address}, ${company.zip} ${company.city}`,
-          source: {
-            name: "GelbeSeiten",
-            type: "GelbeSeiten",
-            date: "Verifiziert am 01.04.2023",
-          },
-        },
-        {
-          field: "Branchenverzeichnis",
-          currentValue: "Nicht gelistet",
-          newValue: "IT-Dienstleister, Software-Entwicklung, Cloud-Services",
-          source: {
-            name: "WLW",
-            type: "WLW",
-            date: "Letzte Aktualisierung: 10.03.2023",
-          },
-        },
-      ]
-
-      setEnrichmentResults(mockResults)
-      setCurrentEnrichmentIndex(0)
+      const updatedContacts = getContactsByCompanyId(companyId);
+      setContacts(updatedContacts);
+      setAddToContactsOpen(false);
     } catch (error) {
-      console.error("Error during enrichment:", error)
-    } finally {
-      setEnrichmentLoading(false)
+      console.error("Error adding contact:", error);
     }
-  }
+  };
 
-  const applyEnrichment = (index: number, apply: boolean) => {
-    // In a real implementation, this would update the company data
-    console.log(`${apply ? "Applied" : "Rejected"} enrichment for ${enrichmentResults[index].field}`)
+  const companyMetrics = [
+    { 
+      name: "Umsatz", 
+      value: company.revenue || "Nicht verfügbar",
+      change: company.revenueChange,
+      trend: company.revenueTrend
+    },
+    { 
+      name: "Mitarbeiter", 
+      value: formatNumber(company.employees) || "Nicht verfügbar",
+      change: company.employeeChange,
+      trend: company.employeeTrend
+    },
+    { 
+      name: "Projekte", 
+      value: company.projects?.length || "0",
+      change: null,
+      trend: null
+    },
+    { 
+      name: "Status", 
+      value: company.status || "Aktiv",
+      change: null,
+      trend: null
+    }
+  ]
 
-    // Move to next enrichment result
+  const saveEnrichmentData = async (field: string, newValue: string) => {
+    if (!company) return;
+    
+    try {
+      const updatedCompany = { ...company };
+      
+      switch (field) {
+        case "Mitarbeiter":
+          updatedCompany.employees = parseInt(newValue);
+          break;
+        case "Umsatz":
+          updatedCompany.revenue = newValue;
+          break;
+        case "Beschreibung":
+          updatedCompany.description = newValue;
+          break;
+        case "Website":
+          updatedCompany.website = newValue;
+          break;
+        case "Adresse":
+          const [address, zip, city, country] = newValue.split(", ");
+          updatedCompany.address = address;
+          updatedCompany.zip = zip;
+          updatedCompany.city = city;
+          updatedCompany.country = country;
+          break;
+      }
+
+      setCompany(updatedCompany);
+      return true;
+    } catch (error) {
+      console.error("Error saving enrichment data:", error);
+      return false;
+    }
+  };
+
+  const applyEnrichment = async (index: number, apply: boolean) => {
+    if (apply) {
+      const success = await saveEnrichmentData(
+        enrichmentResults[index].field,
+        enrichmentResults[index].newValue
+      );
+      
+      if (!success) {
+        console.error("Failed to save enrichment data");
+        return;
+      }
+    }
+
     if (index < enrichmentResults.length - 1) {
-      setCurrentEnrichmentIndex(index + 1)
+      setCurrentEnrichmentIndex(index + 1);
     } else {
-      // Close dialog when all enrichments have been reviewed
-      setEnrichmentOpen(false)
-      setEnrichmentResults([])
-      setCurrentEnrichmentIndex(0)
+      setEnrichmentOpen(false);
+      setEnrichmentResults([]);
+      setCurrentEnrichmentIndex(0);
     }
-  }
+  };
 
   return (
     <div className="space-y-8 pb-10">
-      {/* Header with 3D gradient background */}
       <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-[#0098d1] to-[#00b2f5] p-8 mb-8">
         <div className="absolute top-0 right-0 w-full h-full opacity-20">
           <div className="absolute top-10 right-10 w-20 h-20 rounded-full bg-white"></div>
@@ -367,9 +396,8 @@ export default function CompanyDetail({ companyId }: { companyId: string }) {
         </div>
       </div>
 
-      {/* Key metrics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        {financialMetrics.map((metric, index) => (
+        {companyMetrics.map((metric, index) => (
           <Card
             key={index}
             className="overflow-hidden border-none shadow-md hover:shadow-lg transition-all duration-300 bg-gradient-to-br from-white to-gray-50"
@@ -380,14 +408,20 @@ export default function CompanyDetail({ companyId }: { companyId: string }) {
             <CardContent>
               <div className="flex items-center justify-between">
                 <div className="text-2xl font-bold">{metric.value}</div>
-                <Badge
-                  className={`${metric.trend === "up" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}
-                >
-                  {metric.change}
-                </Badge>
+                {metric.change && (
+                  <Badge
+                    className={`${
+                      metric.trend === "up" 
+                        ? "bg-green-100 text-green-800" 
+                        : "bg-red-100 text-red-800"
+                    }`}
+                  >
+                    {metric.change}
+                  </Badge>
+                )}
               </div>
               <div className="mt-2 text-xs text-muted-foreground">
-                <span>Verglichen zum Vorjahr</span>
+                <span>Stand: {new Date().toLocaleDateString('de-DE')}</span>
               </div>
             </CardContent>
           </Card>
@@ -395,50 +429,62 @@ export default function CompanyDetail({ companyId }: { companyId: string }) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left column - Company info with 3D effect */}
         <Card
-          className="lg:col-span-1 overflow-hidden border-none shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-white to-gray-50"
+          className="lg:col-span-1 overflow-hidden border-none shadow-lg bg-white"
           ref={cardRef}
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => {
-            setIsHovered(false)
-            setRotateX(0)
-            setRotateY(0)
-          }}
-          style={{
-            transform: `perspective(1000px) rotateY(${rotateY}deg) rotateX(${rotateX}deg)`,
-            transition: isHovered ? "none" : "transform 0.5s ease-out",
-          }}
         >
           <CardHeader className="p-6 pb-2">
             <div className="flex flex-col items-center text-center">
-              <div className="h-28 w-28 bg-white rounded-full p-3 border mb-4 flex items-center justify-center shadow-md transform hover:scale-105 transition-transform duration-300">
+              <div className="h-28 w-28 bg-white rounded-full p-3 border mb-4 flex items-center justify-center">
                 <img
                   src={getCompanyLogo(company.website) || "/placeholder.svg"}
                   alt={company.name}
                   className="max-h-20 max-w-20"
                   onError={(e) => {
-                    // Fallback to placeholder if the logo fails to load
                     ;(e.target as HTMLImageElement).src = "/placeholder.svg"
                   }}
                 />
               </div>
-              <CardTitle className="text-xl">{company.name}</CardTitle>
-              <CardDescription className="text-base">{company.industry}</CardDescription>
-              <Badge className="mt-3 mb-1 px-3 py-1 text-sm">
+              <CardTitle className="text-xl text-[#0098d1]">{company.name}</CardTitle>
+              <CardDescription className="text-base text-[#0098d1]/80">{company.industry}</CardDescription>
+              <Badge className="mt-3 mb-1 px-3 py-1 text-sm bg-[#0098d1] text-white">
                 {company.type === "kunde" ? "Kunde" : company.type === "partner" ? "Partner" : "Prospect"}
               </Badge>
             </div>
           </CardHeader>
           <CardContent className="p-6 space-y-6">
-            {/* Company Info */}
             <div>
-              <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-[#0098d1]" />
+              <h3 className="text-sm font-medium mb-3 flex items-center gap-2 text-[#0098d1]">
+                <Building2 className="h-4 w-4" />
                 Unternehmensdaten
               </h3>
-              <div className="space-y-3 pl-6">
-                {isEditing ? (
+              <div className="space-y-3 pl-6 text-[#0098d1]/80">
+                {!isEditing ? (
+                  <>
+                    <div className="text-sm flex items-center gap-2">
+                      <MapPin className="h-4 w-4" />
+                      <span>
+                        {company.address}, {company.zip} {company.city}, {company.country}
+                      </span>
+                    </div>
+                    <a
+                      href={company.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm flex items-center gap-2 text-[#0098d1] hover:text-[#0087ba]"
+                    >
+                      <Globe className="h-4 w-4" />
+                      {company.website ? company.website.replace(/^https?:\/\//, "") : "N/A"}
+                    </a>
+                    <a
+                      href={`mailto:${company.email}`}
+                      className="text-sm flex items-center gap-2 text-[#0098d1] hover:text-[#0087ba]"
+                    >
+                      <Mail className="h-4 w-4" />
+                      {company.email || "N/A"}
+                    </a>
+                  </>
+                ) : (
                   <>
                     <div className="space-y-1">
                       <Label htmlFor="address">Adresse</Label>
@@ -448,6 +494,14 @@ export default function CompanyDetail({ companyId }: { companyId: string }) {
                       <div className="space-y-1">
                         <Label htmlFor="zip">PLZ</Label>
                         <Input id="zip" defaultValue={company.zip} />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="city">Stadt</Label>
+                        <Input id="city" defaultValue={company.city} />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="country">Land</Label>
                       <Input id="country" defaultValue={company.country} />
                     </div>
                     <div className="space-y-1">
@@ -463,49 +517,16 @@ export default function CompanyDetail({ companyId }: { companyId: string }) {
                       <Input id="phone" defaultValue={company.phone} />
                     </div>
                   </>
-                ) : (
-                  <>
-                    <div className="text-sm flex items-center gap-2 hover:text-[#0098d1] transition-colors">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <span>
-                        {company.address}, {company.zip} {company.city}, {company.country}
-                      </span>
-                    </div>
-                    <a
-                      href={company.website}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm flex items-center gap-2 text-blue-600 hover:text-blue-800 transition-colors"
-                    >
-                      <Globe className="h-4 w-4" />
-                      {company.website ? company.website.replace(/^https?:\/\//, "") : "-"}
-                    </a>
-                    <a
-                      href={`mailto:${company.email}`}
-                      className="text-sm flex items-center gap-2 text-blue-600 hover:text-blue-800 transition-colors"
-                    >
-                      <Mail className="h-4 w-4" />
-                      {company.email}
-                    </a>
-                    <a
-                      href={`tel:${company.phone}`}
-                      className="text-sm flex items-center gap-2 text-blue-600 hover:text-blue-800 transition-colors"
-                    >
-                      <Phone className="h-4 w-4" />
-                      {company.phone}
-                    </a>
-                  </>
                 )}
               </div>
             </div>
 
-            {/* Social Media */}
             <div>
-              <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
-                <Globe className="h-4 w-4 text-[#0098d1]" />
+              <h3 className="text-sm font-medium mb-3 flex items-center gap-2 text-[#0098d1]">
+                <Globe className="h-4 w-4" />
                 Social Media
               </h3>
-              <div className="space-y-3 pl-6">
+              <div className="space-y-3 pl-6 text-[#0098d1]/80">
                 {isEditing ? (
                   <>
                     <div className="space-y-1">
@@ -532,7 +553,7 @@ export default function CompanyDetail({ companyId }: { companyId: string }) {
                         href={company.socialMedia.linkedin}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-sm flex items-center gap-2 text-blue-600 hover:text-blue-800 transition-colors"
+                        className="text-sm flex items-center gap-2 text-[#0098d1] hover:text-[#0087ba]"
                       >
                         <AtSign className="h-4 w-4" />
                         LinkedIn
@@ -543,7 +564,7 @@ export default function CompanyDetail({ companyId }: { companyId: string }) {
                         href={company.socialMedia.twitter}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-sm flex items-center gap-2 text-blue-600 hover:text-blue-800 transition-colors"
+                        className="text-sm flex items-center gap-2 text-[#0098d1] hover:text-[#0087ba]"
                       >
                         <AtSign className="h-4 w-4" />
                         Twitter
@@ -554,7 +575,7 @@ export default function CompanyDetail({ companyId }: { companyId: string }) {
                         href={company.socialMedia.facebook}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-sm flex items-center gap-2 text-blue-600 hover:text-blue-800 transition-colors"
+                        className="text-sm flex items-center gap-2 text-[#0098d1] hover:text-[#0087ba]"
                       >
                         <AtSign className="h-4 w-4" />
                         Facebook
@@ -565,7 +586,7 @@ export default function CompanyDetail({ companyId }: { companyId: string }) {
                         href={company.socialMedia.xing}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-sm flex items-center gap-2 text-blue-600 hover:text-blue-800 transition-colors"
+                        className="text-sm flex items-center gap-2 text-[#0098d1] hover:text-[#0087ba]"
                       >
                         <AtSign className="h-4 w-4" />
                         Xing
@@ -582,31 +603,61 @@ export default function CompanyDetail({ companyId }: { companyId: string }) {
               </div>
             </div>
 
-            {/* Company Details */}
             <div>
-              <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
-                <BarChart3 className="h-4 w-4 text-[#0098d1]" />
+              <h3 className="text-sm font-medium mb-3 flex items-center gap-2 text-[#0098d1]">
+                <BarChart3 className="h-4 w-4" />
                 Details
               </h3>
               <div className="space-y-3 pl-6">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Mitarbeiter</span>
+                <div className="flex items-center justify-between text-[#0098d1]/80">
+                  <span className="text-sm">Kundenstatus</span>
+                  <div className="flex items-center gap-2">
+                    <Select value={customerStatus} onValueChange={handleStatusChange}>
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="prospect">Prospect</SelectItem>
+                        <SelectItem value="lead">Lead</SelectItem>
+                        <SelectItem value="kunde">Kunde</SelectItem>
+                        <SelectItem value="partner">Partner</SelectItem>
+                        <SelectItem value="inaktiv">Inaktiv</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {hasUnsavedChanges && (
+                      <Button 
+                        size="sm" 
+                        onClick={handleSave}
+                        className="bg-[#0098d1] hover:bg-[#0087ba] h-8"
+                      >
+                        {saving ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Save className="h-4 w-4" />
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-[#0098d1]/80">
+                  <span className="text-sm">Mitarbeiter</span>
                   {isEditing ? (
                     <Input className="w-32 h-8" defaultValue={company.employees} />
                   ) : (
                     <span className="text-sm font-medium">{formatNumber(company.employees)}</span>
                   )}
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Umsatz</span>
+                <div className="flex items-center justify-between text-[#0098d1]/80">
+                  <span className="text-sm">Umsatz</span>
                   {isEditing ? (
                     <Input className="w-32 h-8" defaultValue={company.revenue || ""} />
                   ) : (
                     <span className="text-sm font-medium">{company.revenue || "–"}</span>
                   )}
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Gründungsjahr</span>
+                <div className="flex items-center justify-between text-[#0098d1]/80">
+                  <span className="text-sm">Gründungsjahr</span>
                   {isEditing ? (
                     <Input className="w-32 h-8" defaultValue={company.foundedYear || ""} />
                   ) : (
@@ -618,7 +669,6 @@ export default function CompanyDetail({ companyId }: { companyId: string }) {
           </CardContent>
         </Card>
 
-        {/* Right column - Tabs */}
         <Card className="lg:col-span-2 overflow-hidden border-none shadow-lg">
           <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab}>
             <CardHeader className="p-6 pb-0 bg-gradient-to-r from-[#f8f9fa] to-white">
@@ -640,33 +690,76 @@ export default function CompanyDetail({ companyId }: { companyId: string }) {
 
             <TabsContent value="overview">
               <CardContent className="p-6 space-y-6">
-                {/* 3D Bar Chart */}
-                <div className="mb-8 bg-gradient-to-r from-gray-50 to-white p-4 rounded-lg shadow-sm">
-                  <h3 className="text-sm font-medium mb-4 flex items-center gap-2">
-                    <BarChart3 className="h-4 w-4 text-[#0098d1]" />
-                    Umsatzentwicklung
-                  </h3>
-                  <div className="h-40 flex items-end justify-between gap-1 px-2">
-                    {chartData.map((value, index) => (
-                      <div key={index} className="relative flex flex-col items-center group">
-                        <div
-                          className="w-8 bg-gradient-to-t from-[#0098d1] to-[#00b2f5] rounded-t-sm transform hover:translate-y-[-5px] transition-transform duration-300"
-                          style={{
-                            height: `${(value / maxValue) * 100}%`,
-                            boxShadow:
-                              "0 10px 15px -3px rgba(0, 152, 209, 0.1), 0 4px 6px -2px rgba(0, 152, 209, 0.05)",
-                          }}
-                        ></div>
-                        <div className="text-xs mt-1 text-gray-500">{`Q${Math.floor(index / 3) + 1}`}</div>
-                        <div className="absolute bottom-full mb-2 bg-gray-800 text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                          {formatNumber(value)}k €
+                {decisionMaker && (
+                  <div className="bg-gradient-to-r from-gray-50 to-white p-4 rounded-lg shadow-sm">
+                    <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
+                      <User className="h-4 w-4 text-[#0098d1]" />
+                      Entscheider
+                    </h3>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <Avatar className="h-10 w-10 border-2 border-[#0098d1]/10">
+                          <AvatarImage src={decisionMaker.image} alt={decisionMaker.name} />
+                          <AvatarFallback>{decisionMaker.name?.split(' ').map((n: string) => n[0]).join('')}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-medium">{decisionMaker.name}</p>
+                          <p className="text-sm text-muted-foreground">{decisionMaker.role}</p>
+                          {decisionMaker.email && (
+                            <a href={`mailto:${decisionMaker.email}`} className="text-sm text-[#0098d1] hover:underline">
+                              <Mail className="h-4 w-4 inline mr-1" />
+                              {decisionMaker.email}
+                            </a>
+                          )}
                         </div>
                       </div>
-                    ))}
+                      {!contacts.some(c => c.email === decisionMaker.email) && (
+                        <Button 
+                          variant="outline" 
+                          onClick={() => setAddToContactsOpen(true)}
+                          className="text-[#0098d1] hover:text-[#0087ba] hover:bg-[#0098d1]/5"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Als Kontakt hinzufügen
+                        </Button>
+                      )}
+                    </div>
                   </div>
+                )}
+
+                <div className="mb-8 bg-gradient-to-r from-gray-50 to-white p-4 rounded-lg shadow-sm">
+                  {company.revenueHistory ? (
+                    <>
+                      <h3 className="text-sm font-medium mb-4 flex items-center gap-2">
+                        <BarChart3 className="h-4 w-4 text-[#0098d1]" />
+                        Umsatzentwicklung
+                      </h3>
+                      <div className="h-40 flex items-end justify-between gap-1 px-2">
+                        {company.revenueHistory.map((value, index) => (
+                          <div key={index} className="relative flex flex-col items-center group">
+                            <div
+                              className="w-8 bg-gradient-to-t from-[#0098d1] to-[#00b2f5] rounded-t-sm transform hover:translate-y-[-5px] transition-transform duration-300"
+                              style={{
+                                height: `${(value / Math.max(...company.revenueHistory)) * 100}%`,
+                                boxShadow: "0 10px 15px -3px rgba(0, 152, 209, 0.1), 0 4px 6px -2px rgba(0, 152, 209, 0.05)",
+                              }}
+                            ></div>
+                            <div className="text-xs mt-1 text-gray-500">{`Q${Math.floor(index / 3) + 1}`}</div>
+                            <div className="absolute bottom-full mb-2 bg-gray-800 text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                              {formatNumber(value)}€
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <BarChart3 className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                      <p>Keine Umsatzdaten verfügbar</p>
+                    </div>
+                  )}
                 </div>
 
-                {/* Description */}
                 <div className="bg-gradient-to-r from-gray-50 to-white p-4 rounded-lg shadow-sm">
                   <h3 className="text-sm font-medium mb-3">Beschreibung</h3>
                   {isEditing ? (
@@ -676,7 +769,6 @@ export default function CompanyDetail({ companyId }: { companyId: string }) {
                   )}
                 </div>
 
-                {/* Key contacts preview */}
                 <div className="bg-gradient-to-r from-gray-50 to-white p-4 rounded-lg shadow-sm">
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-medium flex items-center gap-2">
@@ -736,7 +828,6 @@ export default function CompanyDetail({ companyId }: { companyId: string }) {
                   </div>
                 </div>
 
-                {/* Products and services */}
                 <div className="bg-gradient-to-r from-gray-50 to-white p-4 rounded-lg shadow-sm">
                   <h3 className="text-sm font-medium mb-3">Produkte & Dienstleistungen</h3>
                   {isEditing ? (
@@ -767,6 +858,35 @@ export default function CompanyDetail({ companyId }: { companyId: string }) {
                     </div>
                   )}
                 </div>
+
+                <div className="mt-6 bg-gradient-to-r from-gray-50 to-white p-4 rounded-lg shadow-sm">
+                  <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
+                    <User className="h-4 w-4 text-[#0098d1]" />
+                    Zuständiger Account Manager
+                  </h3>
+                  {assignedEmployee && (
+                    <div className="flex items-center gap-4">
+                      <Avatar className="h-10 w-10 border-2 border-[#0098d1]/10">
+                        <AvatarImage src={assignedEmployee.image} alt={assignedEmployee.name} />
+                        <AvatarFallback>{assignedEmployee.initials}</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium">{assignedEmployee.name}</p>
+                        <p className="text-sm text-muted-foreground">{assignedEmployee.role}</p>
+                        <div className="flex gap-4 mt-1">
+                          <a href={`mailto:${assignedEmployee.email}`} className="text-sm text-[#0098d1] hover:underline">
+                            <Mail className="h-4 w-4 inline mr-1" />
+                            {assignedEmployee.email}
+                          </a>
+                          <a href={`tel:${assignedEmployee.phone}`} className="text-sm text-[#0098d1] hover:underline">
+                            <Phone className="h-4 w-4 inline mr-1" />
+                            {assignedEmployee.phone}
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </TabsContent>
 
@@ -790,8 +910,9 @@ export default function CompanyDetail({ companyId }: { companyId: string }) {
                         <TableRow>
                           <TableHead>Name</TableHead>
                           <TableHead>Position</TableHead>
-                          <TableHead>Kontakt</TableHead>
+                          <TableHead>Rolle</TableHead>
                           <TableHead>Status</TableHead>
+                          <TableHead>Kontakt</TableHead>
                           <TableHead className="text-right">Aktionen</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -809,6 +930,24 @@ export default function CompanyDetail({ companyId }: { companyId: string }) {
                             </TableCell>
                             <TableCell>{contact.position}</TableCell>
                             <TableCell>
+                              <Badge className="bg-blue-100 text-blue-800">
+                                {contact.role}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                className={
+                                  contact.status === "aktiv"
+                                    ? "bg-green-100 text-green-800"
+                                    : contact.status === "lead"
+                                      ? "bg-blue-100 text-blue-800"
+                                      : "bg-gray-100 text-gray-800"
+                                }
+                              >
+                                {contact.status === "aktiv" ? "Aktiv" : contact.status === "lead" ? "Lead" : "Inaktiv"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
                               <div className="flex flex-col gap-1">
                                 <a
                                   href={`mailto:${contact.email}`}
@@ -825,19 +964,6 @@ export default function CompanyDetail({ companyId }: { companyId: string }) {
                                   {contact.phone}
                                 </a>
                               </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                className={
-                                  contact.status === "aktiv"
-                                    ? "bg-green-100 text-green-800"
-                                    : contact.status === "lead"
-                                      ? "bg-blue-100 text-blue-800"
-                                      : "bg-gray-100 text-gray-800"
-                                }
-                              >
-                                {contact.status === "aktiv" ? "Aktiv" : contact.status === "lead" ? "Lead" : "Inaktiv"}
-                              </Badge>
                             </TableCell>
                             <TableCell className="text-right">
                               <Button
@@ -1025,7 +1151,6 @@ export default function CompanyDetail({ companyId }: { companyId: string }) {
         </Card>
       </div>
 
-      {/* Enrichment Dialog */}
       <Dialog open={enrichmentOpen} onOpenChange={setEnrichmentOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -1124,6 +1249,34 @@ export default function CompanyDetail({ companyId }: { companyId: string }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={addToContactsOpen} onOpenChange={setAddToContactsOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Kontakt hinzufügen</AlertDialogTitle>
+            <AlertDialogDescription>
+              Möchten Sie {decisionMaker?.name} als neuen Kontakt hinzufügen?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="mt-4 flex items-center gap-4 p-4 bg-gray-50 rounded-md">
+            <Avatar className="h-12 w-12">
+              <AvatarImage src={decisionMaker?.image} />
+              <AvatarFallback>{decisionMaker?.name?.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+            </Avatar>
+            <div>
+              <h4 className="font-medium">{decisionMaker?.name}</h4>
+              <p className="text-sm text-muted-foreground">{decisionMaker?.role}</p>
+              <p className="text-sm text-[#0098d1]">{decisionMaker?.email}</p>
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction onClick={handleAddToContacts}>
+              Hinzufügen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

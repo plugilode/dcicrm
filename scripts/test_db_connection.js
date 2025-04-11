@@ -1,22 +1,35 @@
-const { PrismaClient } = require('@prisma/client');
-
-const prisma = new PrismaClient({
-  datasources: {
-    db: {
-      url: "postgres://01961bf8-a6ff-7f3a-9205-91ea6089959a:954d2d57-91fc-4add-a596-c80338f9f4c0@eu-central-1.db.thenile.dev/nile_cyan_door"
-    }
-  }
-});
+const { Pool } = require('pg');
+require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 
 async function testConnection() {
+  console.log('Database URL:', process.env.DATABASE_URL ? 'Set' : 'Not set');
+  
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: false // Disable SSL for testing
+  });
+
   try {
-    const result = await prisma.$queryRaw`SELECT 1`;
-    console.log('Database connection successful:', result);
+    console.log('Attempting database connection...');
+    const client = await pool.connect();
+    console.log('Successfully connected to database');
+    
+    const result = await client.query('SELECT NOW()');
+    console.log('Query successful. Current timestamp:', result.rows[0].now);
+    
+    await client.end();
   } catch (error) {
-    console.error('Database connection failed:', error);
+    console.error('Database connection error:');
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    console.error('Error code:', error.code);
+    if (error.stack) console.error('Stack trace:', error.stack);
   } finally {
-    await prisma.$disconnect();
+    await pool.end().catch(console.error);
   }
 }
 
-testConnection();
+testConnection().catch(error => {
+  console.error('Unhandled error:', error);
+  process.exit(1);
+});

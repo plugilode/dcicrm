@@ -40,6 +40,7 @@ import {
   Users,
   Wallet,
 } from "lucide-react"
+import { logout } from "@/lib/auth"
 import { UserCalendarIntegration } from "@/components/ui/user-calendar-integration"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -122,7 +123,10 @@ export default function DCIMediaEnterpriseSuite() {
                 <Settings className="h-5 w-5" />
                 <span>Einstellungen</span>
               </button>
-              <button className="flex items-center gap-3 w-full p-2 rounded-md text-[#f13e3e]">
+              <button 
+                onClick={logout}
+                className="flex items-center gap-3 w-full p-2 rounded-md text-[#f13e3e]"
+              >
                 <LogOut className="h-5 w-5" />
                 <span>Abmelden</span>
               </button>
@@ -199,7 +203,7 @@ export default function DCIMediaEnterpriseSuite() {
                     <Sparkles className="h-5 w-5 text-white" />
                     <p className="text-white text-sm font-medium">KI-ASSISTENT</p>
                   </div>
-                  <h1 className="text-white text-2xl font-bold mb-2">Willkommen zurück, Patrick!</h1>
+<h1 className="text-white text-2xl font-bold mb-2">Willkommen zurück, {user.firstName}!</h1>
                   <p className="text-white opacity-90 mb-4">
                     Ihr KI-Assistent hat 5 neue Lead-Vorschläge und 3 Aufgaben für Sie vorbereitet.
                   </p>

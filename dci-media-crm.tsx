@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { logout } from "@/lib/auth"
 import {
   BarChart3,
   Bell,
@@ -19,6 +20,7 @@ import {
   PieChart,
   Search,
   Settings,
+  Shield,
   Users,
 } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -26,6 +28,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
+import AdminMenu from "@/components/AdminMenu"
+import PasswordChangeDialog from "@/components/PasswordChangeDialog"
 
 export default function DCIMediaCRM() {
   const [activeTab, setActiveTab] = useState("Dashboard")
@@ -93,7 +97,10 @@ export default function DCIMediaCRM() {
                 <Settings className="h-5 w-5" />
                 <span>Einstellungen</span>
               </button>
-              <button className="flex items-center gap-3 w-full p-2 rounded-md text-[#f13e3e]">
+              <button 
+                onClick={logout}
+                className="flex items-center gap-3 w-full p-2 rounded-md text-[#f13e3e]"
+              >
                 <LogOut className="h-5 w-5" />
                 <span>Abmelden</span>
               </button>
@@ -306,9 +313,12 @@ export default function DCIMediaCRM() {
       <div className="w-72 border-l border-[#e5e7eb] p-6">
         <div className="flex justify-between items-center mb-6">
           <h2 className="font-semibold">Ihr Profil</h2>
-          <Button variant="ghost" size="icon">
-            <MoreVertical className="h-5 w-5" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <AdminMenu />
+            <Button variant="ghost" size="icon">
+              <MoreVertical className="h-5 w-5" />
+            </Button>
+          </div>
         </div>
 
         <div className="flex flex-col items-center mb-8">
@@ -318,21 +328,17 @@ export default function DCIMediaCRM() {
               <AvatarImage src={`/placeholder.svg?height=80&width=80`} alt="Profile" />
               <AvatarFallback>JM</AvatarFallback>
             </Avatar>
+            <div className="absolute -bottom-1 -right-1 bg-[#0098d1] rounded-full p-1.5">
+              <Shield className="h-4 w-4 text-white" />
+            </div>
           </div>
-          <h3 className="font-semibold text-lg">Guten Tag, Johannes</h3>
-          <p className="text-sm text-center text-[#6b7280] mt-1">Sie haben 5 neue Leads für Ihre Kampagnen</p>
-
-          <div className="flex gap-3 mt-4">
-            <Button variant="outline" size="icon" className="rounded-full">
-              <Bell className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="icon" className="rounded-full">
-              <Inbox className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="icon" className="rounded-full">
-              <Calendar className="h-4 w-4" />
-            </Button>
+          <h3 className="font-semibold text-lg">Johannes Müller</h3>
+          <p className="text-sm text-center text-[#7e7e7e] mt-1">Senior Account Manager</p>
+          <div className="flex items-center gap-2 mt-2">
+            <Badge className="bg-[#0098d1] text-white">Admin</Badge>
+            <Badge variant="outline" className="text-[#0098d1]">System Manager</Badge>
           </div>
+          <PasswordChangeDialog />
         </div>
 
         <div className="mb-8">

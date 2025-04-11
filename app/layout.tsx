@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import HiddenAdminLink from "@/components/admin/hidden-admin-link";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -17,6 +18,8 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // The login page has its own layout, so this shouldn't apply to login page anymore
+  // This is just an additional safeguard
   return (
     <html lang="de" suppressHydrationWarning>
       <body className={inter.className}>
@@ -33,13 +36,11 @@ export default function RootLayout({
             </header>
             {/* Main Content Area */}
             <div className="p-4">{children}</div>
+            {/* Hidden Admin Link - activated with Alt+A */}
+            <HiddenAdminLink />
           </div>
         </ThemeProvider>
       </body>
     </html>
   );
 }
-
-
-
-import './globals.css'
