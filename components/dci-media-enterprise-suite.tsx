@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import {
   Activity,
@@ -52,8 +52,40 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
+interface User {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;
+  stats: {
+    companies: number;
+    contacts: number;
+    activeDeals: number;
+    upcomingMeetings: number;
+  };
+}
+
 export default function DCIMediaEnterpriseSuite() {
-  const [activeTab, setActiveTab] = useState("Dashboard")
+  const [activeTab, setActiveTab] = useState("Dashboard");
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    async function fetchUserData() {
+      try {
+        const response = await fetch('/api/user', { credentials: 'include' });
+        if (!response.ok) {
+          throw new Error('Failed to fetch user data');
+        }
+        const data = await response.json();
+        setUser(data);
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+      }
+    }
+
+    fetchUserData();
+  }, []);
   const [activeModule, setActiveModule] = useState("crm")
 
   return (
@@ -203,7 +235,7 @@ export default function DCIMediaEnterpriseSuite() {
                     <Sparkles className="h-5 w-5 text-white" />
                     <p className="text-white text-sm font-medium">KI-ASSISTENT</p>
                   </div>
-<h1 className="text-white text-2xl font-bold mb-2">Willkommen zurück, {user.firstName}!</h1>
+<h1 className="text-white text-2xl font-bold mb-2">Willkommen zurück, {user ? user.firstName : 'Gast'}!</h1>
                   <p className="text-white opacity-90 mb-4">
                     Ihr KI-Assistent hat 5 neue Lead-Vorschläge und 3 Aufgaben für Sie vorbereitet.
                   </p>
